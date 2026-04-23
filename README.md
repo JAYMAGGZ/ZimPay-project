@@ -1,7 +1,7 @@
 # ZimPay - Hybrid Contactless Payment System
 
 **Capstone Project - Bachelor of Engineering Honours (Computer Engineering)**  
-**Student:** Jay Magorimbo (C21146189F)  
+**Student:** Junior Tapiwanashe Magorimbo (C21146189F)  
 **Supervisor:** Dr. Chinyuku  
 **Institution:** Chinhoyi University of Technology
 
@@ -13,9 +13,9 @@ ZimPay is a hybrid contactless payment system designed for Zimbabwe's multi-sect
 
 This capstone project consists of three main repositories:
 
-1. **[zimpay-backend](https://github.com/YOUR_USERNAME/zimpay-backend)** - Laravel 13 REST API
-2. **[zimpay-consumer](https://github.com/YOUR_USERNAME/zimpay-consumer)** - Flutter Consumer Mobile App
-3. **[zimpay-merchant](https://github.com/YOUR_USERNAME/zimpay-merchant)** - Flutter Merchant Dashboard (Coming Soon)
+1. **[zimpay-backend](https://github.com/JAYMAGGZ/zimpay-backend)** - Laravel 13 REST API
+2. **[zimpay-consumer](https://github.com/JAYMAGGZ/zimpay-consumer)** - Flutter Consumer Mobile App
+3. **[zimpay-merchant](https://github.com/JAYMAGGZ/zimpay-merchant)** - Flutter Merchant Dashboard (Coming Soon)
 
 ## Technology Stack
 
