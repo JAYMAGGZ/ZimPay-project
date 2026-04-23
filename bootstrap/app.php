@@ -12,11 +12,15 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
-        // Register JWT auth middleware alias
-        $middleware->alias([
-            'auth.jwt' => \App\Http\Middleware\JWTAuthMiddleware::class,
-        ]);
-    })
+    $middleware->alias([
+        'auth.jwt' => \App\Http\Middleware\JWTAuthMiddleware::class,
+    ]);
+    
+    // Enable CORS for API routes
+    $middleware->api(prepend: [
+        \Illuminate\Http\Middleware\HandleCors::class,
+    ]);
+})
     ->withExceptions(function (Exceptions $exceptions) {
         //
     })->create();

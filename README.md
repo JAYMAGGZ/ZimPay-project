@@ -1,58 +1,69 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ZimPay - Hybrid Contactless Payment System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+**Capstone Project - Bachelor of Engineering Honours (Computer Engineering)**  
+**Student:** Jay Magorimbo (C21146189F)  
+**Supervisor:** Dr. Chinyuku  
+**Institution:** Chinhoyi University of Technology
 
-## About Laravel
+## Overview
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+ZimPay is a hybrid contactless payment system designed for Zimbabwe's multi-sector commerce ecosystem, integrating NFC, QR code, and USSD payment technologies.
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Project Repositories
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+This capstone project consists of three main repositories:
 
-## Learning Laravel
+1. **[zimpay-backend](https://github.com/YOUR_USERNAME/zimpay-backend)** - Laravel 13 REST API
+2. **[zimpay-consumer](https://github.com/YOUR_USERNAME/zimpay-consumer)** - Flutter Consumer Mobile App
+3. **[zimpay-merchant](https://github.com/YOUR_USERNAME/zimpay-merchant)** - Flutter Merchant Dashboard (Coming Soon)
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Technology Stack
 
-In addition, [Laracasts](https://laracasts.com) contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+### Backend
+- **Framework:** Laravel 13
+- **Database:** MySQL
+- **Authentication:** JWT (HS256)
+- **API:** RESTful
 
-You can also watch bite-sized lessons with real-world projects on [Laravel Learn](https://laravel.com/learn), where you will be guided through building a Laravel application from scratch while learning PHP fundamentals.
+### Mobile Applications
+- **Framework:** Flutter
+- **State Management:** Provider
+- **Payment Methods:** QR Code, NFC, USSD
 
-## Agentic Development
+## Research Details
 
-Laravel's predictable structure and conventions make it ideal for AI coding agents like Claude Code, Cursor, and GitHub Copilot. Install [Laravel Boost](https://laravel.com/docs/ai) to supercharge your AI workflow:
+- **Research Framework:** Design Science Research (DSR)
+- **Stakeholder Interviews:** n=10 (5 formal merchants, 5 informal vendors)
+- **User Acceptance Testing:** n=8 (5 consumers, 3 merchants)
+- **Research Location:** Chinhoyi urban area
+- **Proposal Due:** End of May 2026
 
-```bash
-composer require laravel/boost --dev
+## Features
 
-php artisan boost:install
-```
+### Consumer App
+- Multi-method payments (QR/NFC/USSD)
+- Wallet management
+- Transaction history
+- Real-time balance updates
 
-Boost provides your agent 15+ tools and skills that help agents build Laravel applications while following best practices.
+### Merchant App
+- QR code generation
+- NFC tag writing
+- Sales dashboard
+- Payment analytics
 
-## Contributing
+## Development Status
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+- [x] Backend API Complete
+- [x] Consumer App - Authentication
+- [ ] Consumer App - Payment Flow
+- [ ] Consumer App - Complete
+- [ ] Merchant App - In Progress
 
-## Code of Conduct
+## Documentation
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
-
-## Security Vulnerabilities
-
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+See individual repositories for detailed setup instructions and API documentation.
 
 ## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+Academic Project - All Rights Reserved
