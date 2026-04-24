@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\WalletController;
@@ -10,53 +11,49 @@ use App\Http\Controllers\MerchantController;
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-|
-| ZimPay API Routes
-| All routes return JSON responses
-|
 */
 
-// Public routes (no authentication required)
+// Health check (public)
+Route::get('/health', function () {
+    return response()->json(['status' => 'ok']);
+});
+
+// Authentication routes (public)
 Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 });
 
-// Protected routes (require JWT authentication)
+// Protected routes (require authentication)
 Route::middleware('auth.jwt')->group(function () {
     
     // User routes
-    Route::get('/user', [AuthController::class, 'getUser']);
-    
+    Route::get('/user', function (Request $request) {
+        $user = $request->user()->load('wallet', 'merchant');
+        return response()->json([
+            'success' => true,
+            'user' => $user
+        ]);
+    });
+
     // Wallet routes
     Route::prefix('wallet')->group(function () {
         Route::get('/balance', [WalletController::class, 'getBalance']);
-        Route::post('/topup', [WalletController::class, 'topUp']);
         Route::get('/summary', [WalletController::class, 'getSummary']);
+        Route::post('/top-up', [WalletController::class, 'topUp']);
     });
-    
+
     // Transaction routes
     Route::prefix('transactions')->group(function () {
-        Route::post('/initiate', [TransactionController::class, 'initiate']);
         Route::get('/history', [TransactionController::class, 'getHistory']);
-        Route::get('/{reference}', [TransactionController::class, 'getByReference']);
+        Route::get('/{reference}', [TransactionController::class, 'getTransaction']);
+        Route::post('/initiate', [TransactionController::class, 'initiatePayment']);
     });
-    
-    // Merchant routes (merchant role only)
-    Route::prefix('merchant')->group(function () {
-        Route::post('/qr-code', [MerchantController::class, 'generateQRCode']);
-        Route::get('/dashboard', [MerchantController::class, 'getDashboard']);
-        Route::get('/profile', [MerchantController::class, 'getProfile']);
-        Route::put('/profile', [MerchantController::class, 'updateProfile']);
-    });
-});
 
-// Health check endpoint
-Route::get('/health', function () {
-    return response()->json([
-        'status' => 'ok',
-        'service' => 'ZimPay API',
-        'version' => '1.0.0',
-        'timestamp' => now()->toIso8601String(),
-    ]);
+    // Merchant routes
+    Route::prefix('merchant')->group(function () {
+        Route::get('/profile', [MerchantController::class, 'getProfile']);
+        Route::get('/dashboard', [MerchantController::class, 'getDashboard']);
+        Route::post('/qr-code', [MerchantController::class, 'generateQrCode']);
+    });
 });

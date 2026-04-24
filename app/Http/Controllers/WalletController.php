@@ -2,171 +2,140 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Services\PaymentService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
-/**
- * Wallet Controller
- * 
- * Handles wallet balance queries and top-up operations
- */
 class WalletController extends Controller
 {
-    protected $paymentService;
-
-    public function __construct(PaymentService $paymentService)
-    {
-        $this->paymentService = $paymentService;
-    }
-
     /**
-     * Get wallet balance for authenticated user.
-     * 
-     * GET /api/wallet/balance
-     * Headers: Authorization: Bearer {token}
+     * Get wallet balance
      */
     public function getBalance(Request $request)
     {
         try {
             $user = $request->user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized',
-                ], 401);
-            }
-
             $wallet = $user->wallet;
 
             if (!$wallet) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Wallet not found',
+                    'error' => 'Wallet not found'
                 ], 404);
             }
 
             return response()->json([
                 'success' => true,
-                'balance' => $wallet->balance,
-                'formatted_balance' => $wallet->formatted_balance,
-                'currency' => $wallet->currency,
-                'last_updated' => $wallet->updated_at->toIso8601String(),
-            ], 200);
+                'wallet' => [
+                    'id' => $wallet->id,
+                    'balance' => number_format($wallet->balance, 2, '.', ''),
+                    'currency' => $wallet->currency ?? 'USD',
+                    'formatted_balance' => '$' . number_format($wallet->balance, 2)
+                ]
+            ]);
 
         } catch (\Exception $e) {
+            Log::error('Get balance error: ' . $e->getMessage());
+            
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => 'Failed to fetch balance'
             ], 500);
         }
     }
 
     /**
-     * Top up wallet balance (simulated for prototype).
-     * 
-     * POST /api/wallet/topup
-     * Body: {amount}
-     * Headers: Authorization: Bearer {token}
-     */
-    public function topUp(Request $request)
-    {
-        // Validate request
-        $validator = Validator::make($request->all(), [
-            'amount' => 'required|numeric|min:1|max:10000',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 400);
-        }
-
-        try {
-            $user = $request->user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized',
-                ], 401);
-            }
-
-            // Process top-up using payment service
-            $result = $this->paymentService->topUpWallet($user->id, $request->amount);
-
-            if ($result['success']) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Wallet topped up successfully',
-                    'new_balance' => $result['new_balance'],
-                    'amount_added' => $request->amount,
-                ], 200);
-            }
-
-            return response()->json([
-                'success' => false,
-                'error' => $result['error'],
-            ], 500);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Get wallet transaction summary.
-     * 
-     * GET /api/wallet/summary
-     * Headers: Authorization: Bearer {token}
+     * Get wallet summary
      */
     public function getSummary(Request $request)
     {
         try {
             $user = $request->user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized',
-                ], 401);
-            }
-
             $wallet = $user->wallet;
 
-            // Get transaction statistics
-            $totalSent = $user->sentTransactions()
-                ->where('status', 'completed')
-                ->sum('amount');
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Wallet not found'
+                ], 404);
+            }
 
-            $totalReceived = $user->receivedTransactions()
-                ->where('status', 'completed')
-                ->sum('amount');
-
-            $transactionCount = $user->sentTransactions()->count() + 
-                               $user->receivedTransactions()->count();
+            // Get transaction counts
+            $totalSent = $user->sentTransactions()->where('status', 'completed')->count();
+            $totalReceived = $user->receivedTransactions()->where('status', 'completed')->count();
 
             return response()->json([
                 'success' => true,
+                'wallet' => [
+                    'balance' => number_format($wallet->balance, 2, '.', ''),
+                    'currency' => $wallet->currency ?? 'USD',
+                    'formatted_balance' => '$' . number_format($wallet->balance, 2)
+                ],
                 'summary' => [
-                    'current_balance' => $wallet->balance,
                     'total_sent' => $totalSent,
                     'total_received' => $totalReceived,
-                    'transaction_count' => $transactionCount,
-                    'currency' => $wallet->currency,
-                ],
-            ], 200);
+                    'total_transactions' => $totalSent + $totalReceived
+                ]
+            ]);
 
         } catch (\Exception $e) {
+            Log::error('Get summary error: ' . $e->getMessage());
+            
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => 'Failed to fetch summary'
+            ], 500);
+        }
+    }
+
+    /**
+     * Top up wallet
+     */
+    public function topUp(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'amount' => 'required|numeric|min:0.01|max:10000'
+            ]);
+
+            $user = $request->user();
+            $wallet = $user->wallet;
+
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Wallet not found'
+                ], 404);
+            }
+
+            // Update balance
+            $wallet->balance += $validated['amount'];
+            $wallet->save();
+
+            Log::info("Wallet topped up: User {$user->id}, Amount: {$validated['amount']}, New Balance: {$wallet->balance}");
+
+            return response()->json([
+                'success' => true,
+                'wallet' => [
+                    'id' => $wallet->id,
+                    'balance' => number_format($wallet->balance, 2, '.', ''),
+                    'currency' => $wallet->currency ?? 'USD',
+                    'formatted_balance' => '$' . number_format($wallet->balance, 2)
+                ],
+                'message' => 'Wallet topped up successfully'
+            ]);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid amount: ' . $e->getMessage()
+            ], 422);
+
+        } catch (\Exception $e) {
+            Log::error('Top-up error: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Top-up failed: ' . $e->getMessage()
             ], 500);
         }
     }

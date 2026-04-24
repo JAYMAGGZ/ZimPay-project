@@ -40,3 +40,5 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+zimpay_consumer/
+zimpay_merchant/

@@ -25,6 +25,19 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        $normalizedPhone = $this->normalizeZimbabwePhone($request->phone_number);
+
+        if (!$normalizedPhone) {
+            return response()->json([
+                'success' => false,
+                'errors' => [
+                    'phone_number' => ['Invalid Zimbabwe phone number format'],
+                ],
+            ], 400);
+        }
+
+        $request->merge(['phone_number' => $normalizedPhone]);
+
         // Validate request
         $validator = Validator::make($request->all(), [
             'phone_number' => 'required|string|regex:/^\+263[0-9]{9}$/|unique:users,phone_number',
@@ -116,9 +129,18 @@ class AuthController extends Controller
             ], 400);
         }
 
+        $normalizedPhone = $this->normalizeZimbabwePhone($request->phone_number);
+
+        if (!$normalizedPhone) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Invalid credentials',
+            ], 401);
+        }
+
         try {
             // Find user by phone number
-            $user = User::where('phone_number', $request->phone_number)->first();
+            $user = User::where('phone_number', $normalizedPhone)->first();
 
             if (!$user) {
                 return response()->json([
@@ -245,6 +267,40 @@ class AuthController extends Controller
         $signature = base64_encode($signature);
 
         return "$header.$payload.$signature";
+    }
+
+    /**
+     * Normalize Zimbabwe phone numbers to +2637XXXXXXXX format.
+     */
+    private function normalizeZimbabwePhone(?string $phoneNumber): ?string
+    {
+        if (!$phoneNumber) {
+            return null;
+        }
+
+        // Keep only digits and a possible leading plus sign.
+        $clean = preg_replace('/[^0-9+]/', '', trim($phoneNumber));
+
+        if (!$clean) {
+            return null;
+        }
+
+        if (str_starts_with($clean, '+263')) {
+            $local = substr($clean, 4);
+        } elseif (str_starts_with($clean, '263')) {
+            $local = substr($clean, 3);
+        } elseif (str_starts_with($clean, '0')) {
+            $local = substr($clean, 1);
+        } else {
+            $local = $clean;
+        }
+
+        // ZW mobile numbers after country/leading zero should be 9 digits and start with 7.
+        if (!preg_match('/^7[0-9]{8}$/', $local)) {
+            return null;
+        }
+
+        return '+263' . $local;
     }
 
     /**

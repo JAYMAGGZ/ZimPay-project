@@ -11,6 +11,16 @@ use Illuminate\Support\Carbon;
  * User Model
  * 
  * Represents system users (consumers and merchants)
+ *
+ * @property int $id
+ * @property string $phone_number
+ * @property string $pin_hash
+ * @property string $role
+ * @property bool $is_active
+ * @property int $failed_login_attempts
+ * @property \Illuminate\Support\Carbon|null $locked_until
+ * @property \Illuminate\Support\Carbon|null $created_at
+ * @property \Illuminate\Support\Carbon|null $updated_at
  */
 class User extends Model
 {

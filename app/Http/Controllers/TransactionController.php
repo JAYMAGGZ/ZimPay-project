@@ -2,215 +2,301 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\Merchant;
-use App\Models\Transaction;
-use App\Services\PaymentService;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
+use App\Models\Transaction;
+use App\Models\Merchant;
+use App\Models\User;
 
-/**
- * Transaction Controller
- * 
- * Handles payment initiation, confirmation, and transaction history
- */
 class TransactionController extends Controller
 {
-    protected $paymentService;
-
-    public function __construct(PaymentService $paymentService)
-    {
-        $this->paymentService = $paymentService;
-    }
-
     /**
-     * Initiate a payment transaction.
-     * 
-     * POST /api/transactions/initiate
-     * Body: {receiver_id OR merchant_code, amount, payment_method, pin}
-     * Headers: Authorization: Bearer {token}
-     */
-    public function initiate(Request $request)
-    {
-        // Validate request
-        $validator = Validator::make($request->all(), [
-            'amount' => 'required|numeric|min:0.01|max:10000',
-            'payment_method' => 'required|in:qr,ussd,nfc',
-            'pin' => 'required|string',
-            'receiver_id' => 'required_without:merchant_code|integer|exists:users,id',
-            'merchant_code' => 'required_without:receiver_id|string|exists:merchants,merchant_code',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'success' => false,
-                'errors' => $validator->errors(),
-            ], 400);
-        }
-
-        try {
-            $user = $request->user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized',
-                ], 401);
-            }
-
-            // Verify PIN
-            if (!Hash::check($request->pin, $user->pin_hash)) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Invalid PIN',
-                ], 401);
-            }
-
-            // Determine receiver ID
-            if ($request->has('merchant_code')) {
-                $merchant = Merchant::where('merchant_code', $request->merchant_code)->first();
-                $receiverId = $merchant->user_id;
-            } else {
-                $receiverId = $request->receiver_id;
-            }
-
-            // Prevent self-payment
-            if ($user->id === $receiverId) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Cannot send payment to yourself',
-                ], 400);
-            }
-
-            // Process payment
-            $result = $this->paymentService->processPayment(
-                $user->id,
-                $receiverId,
-                $request->amount,
-                $request->payment_method
-            );
-
-            if ($result['success']) {
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Payment successful',
-                    'transaction' => [
-                        'reference' => $result['transaction']->transaction_reference,
-                        'amount' => $result['transaction']->formatted_amount,
-                        'status' => $result['transaction']->status,
-                        'created_at' => $result['transaction']->created_at->toIso8601String(),
-                    ],
-                    'receipt' => $result['receipt'],
-                    'new_balance' => $result['new_balance'],
-                ], 200);
-            }
-
-            return response()->json([
-                'success' => false,
-                'error' => $result['error'],
-                'transaction' => $result['transaction'] ? [
-                    'reference' => $result['transaction']->transaction_reference,
-                    'status' => $result['transaction']->status,
-                ] : null,
-            ], 400);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Transaction failed: ' . $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
-     * Get transaction history for authenticated user.
-     * 
-     * GET /api/transactions/history
-     * Query params: ?limit=20
-     * Headers: Authorization: Bearer {token}
+     * Get transaction history
      */
     public function getHistory(Request $request)
     {
         try {
+            $limit = $request->input('limit', 20);
             $user = $request->user();
 
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized',
-                ], 401);
-            }
+            // Get all transactions (sent and received)
+            $sentTransactions = $user->sentTransactions()
+                ->with(['receiver.merchant', 'sender.merchant'])
+                ->latest()
+                ->limit($limit)
+                ->get()
+                ->map(function ($transaction) use ($user) {
+                    return [
+                        'id' => $transaction->id,
+                        'reference' => $transaction->transaction_reference,
+                        'type' => 'sent',
+                        'amount' => '$' . number_format($transaction->amount, 2),
+                        'counterparty' => $this->resolveCounterpartyLabel($transaction->receiver),
+                        'method' => $transaction->payment_method,
+                        'status' => $transaction->status,
+                        'date' => $transaction->created_at->format('Y-m-d H:i:s')
+                    ];
+                });
 
-            $limit = $request->query('limit', 20);
-            $history = $this->paymentService->getTransactionHistory($user->id, $limit);
+            $receivedTransactions = $user->receivedTransactions()
+                ->with(['receiver.merchant', 'sender.merchant'])
+                ->latest()
+                ->limit($limit)
+                ->get()
+                ->map(function ($transaction) use ($user) {
+                    return [
+                        'id' => $transaction->id,
+                        'reference' => $transaction->transaction_reference,
+                        'type' => 'received',
+                        'amount' => '$' . number_format($transaction->amount, 2),
+                        'counterparty' => $this->resolveCounterpartyLabel($transaction->sender),
+                        'method' => $transaction->payment_method,
+                        'status' => $transaction->status,
+                        'date' => $transaction->created_at->format('Y-m-d H:i:s')
+                    ];
+                });
+
+            $transactions = $sentTransactions->concat($receivedTransactions)
+                ->sortByDesc('date')
+                ->take($limit)
+                ->values();
 
             return response()->json([
                 'success' => true,
-                'transactions' => $history,
-                'count' => count($history),
-            ], 200);
+                'transactions' => $transactions
+            ]);
 
         } catch (\Exception $e) {
+            Log::error('Get history error: ' . $e->getMessage());
+            
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => 'Failed to fetch transaction history'
             ], 500);
         }
     }
 
     /**
-     * Get transaction details by reference.
-     * 
-     * GET /api/transactions/{reference}
-     * Headers: Authorization: Bearer {token}
+     * Get single transaction
      */
-    public function getByReference(Request $request, string $reference)
+    public function getTransaction(Request $request, $reference)
     {
         try {
             $user = $request->user();
-
-            if (!$user) {
-                return response()->json([
-                    'success' => false,
-                    'error' => 'Unauthorized',
-                ], 401);
-            }
 
             $transaction = Transaction::where('transaction_reference', $reference)
                 ->where(function($query) use ($user) {
                     $query->where('sender_id', $user->id)
                           ->orWhere('receiver_id', $user->id);
                 })
+                ->with(['receiver.merchant', 'sender.merchant'])
                 ->first();
 
             if (!$transaction) {
                 return response()->json([
                     'success' => false,
-                    'error' => 'Transaction not found',
+                    'error' => 'Transaction not found'
                 ], 404);
             }
+
+            $type = $transaction->sender_id == $user->id ? 'sent' : 'received';
+            $counterparty = $type == 'sent' 
+                ? $this->resolveCounterpartyLabel($transaction->receiver)
+                : $this->resolveCounterpartyLabel($transaction->sender);
 
             return response()->json([
                 'success' => true,
                 'transaction' => [
+                    'id' => $transaction->id,
                     'reference' => $transaction->transaction_reference,
-                    'amount' => $transaction->formatted_amount,
-                    'sender' => $transaction->sender->phone_number,
-                    'receiver' => $transaction->receiver->merchant->business_name ?? $transaction->receiver->phone_number,
-                    'payment_method' => strtoupper($transaction->payment_method),
-                    'status' => ucfirst($transaction->status),
-                    'date' => $transaction->created_at->format('d M Y, H:i'),
-                    'error_message' => $transaction->error_message,
-                ],
-                'receipt' => $transaction->getReceiptData(),
-            ], 200);
+                    'type' => $type,
+                    'amount' => '$' . number_format($transaction->amount, 2),
+                    'counterparty' => $counterparty,
+                    'method' => $transaction->payment_method,
+                    'status' => $transaction->status,
+                    'date' => $transaction->created_at->format('Y-m-d H:i:s')
+                ]
+            ]);
 
         } catch (\Exception $e) {
+            Log::error('Get transaction error: ' . $e->getMessage());
+            
             return response()->json([
                 'success' => false,
-                'error' => $e->getMessage(),
+                'error' => 'Failed to fetch transaction'
             ], 500);
         }
+    }
+
+    /**
+     * Initiate payment
+     */
+    public function initiatePayment(Request $request)
+    {
+        try {
+            // Validate request
+            $validated = $request->validate([
+                'merchant_code' => 'required_without:receiver_id|string',
+                'receiver_id' => 'required_without:merchant_code|integer',
+                'amount' => 'required|numeric|min:0.01',
+                'payment_method' => 'required|in:qr,nfc,ussd,QR,NFC,USSD',
+                'pin' => 'required|string|min:4|max:6'
+            ]);
+
+            $user = $request->user();
+            $wallet = $user->wallet;
+
+            // Verify PIN
+            if (!Hash::check($validated['pin'], $user->pin_hash)) {
+                Log::warning("Incorrect PIN attempt for user {$user->id}");
+                
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Incorrect PIN'
+                ], 401);
+            }
+
+            // Check wallet exists
+            if (!$wallet) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Wallet not found'
+                ], 404);
+            }
+
+            // Check balance
+            if ($wallet->balance < $validated['amount']) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Insufficient balance'
+                ], 400);
+            }
+
+            // Find receiver (merchant or user)
+            $receiverWallet = null;
+            $counterparty = null;
+
+            if (isset($validated['merchant_code'])) {
+                // Find merchant
+                $merchant = Merchant::where('merchant_code', $validated['merchant_code'])->first();
+                
+                if (!$merchant) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Merchant not found'
+                    ], 404);
+                }
+                
+                $receiverWallet = $merchant->user->wallet ?? null;
+                $counterparty = $merchant->business_name;
+                $receiverId = $merchant->user_id;
+
+            } else {
+                // Find user
+                $receiver = User::find($validated['receiver_id']);
+                
+                if (!$receiver) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Receiver not found'
+                    ], 404);
+                }
+                
+                $receiverWallet = $receiver->wallet;
+                $counterparty = $receiver->phone_number;
+                $receiverId = $receiver->id;
+            }
+
+            if (!$receiverWallet) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Receiver wallet not found'
+                ], 404);
+            }
+
+            $paymentMethod = strtolower($validated['payment_method']);
+
+            // Start database transaction
+            DB::beginTransaction();
+
+            try {
+                // Create transaction record
+                $transaction = Transaction::create([
+                    'transaction_reference' => Transaction::generateReference(),
+                    'sender_id' => $user->id,
+                    'receiver_id' => $receiverId,
+                    'amount' => $validated['amount'],
+                    'currency' => $wallet->currency ?? 'USD',
+                    'payment_method' => $paymentMethod,
+                    'status' => 'completed',
+                ]);
+
+                // Update sender balance
+                $wallet->balance -= $validated['amount'];
+                $wallet->save();
+
+                // Update receiver balance
+                $receiverWallet->balance += $validated['amount'];
+                $receiverWallet->save();
+
+                DB::commit();
+
+                Log::info("Payment successful: User {$user->id} paid {$validated['amount']} to {$receiverId} via {$paymentMethod}");
+
+                return response()->json([
+                    'success' => true,
+                    'transaction' => [
+                        'id' => $transaction->id,
+                        'reference' => $transaction->transaction_reference,
+                        'amount' => number_format((float) $transaction->amount, 2, '.', ''),
+                        'type' => 'sent',
+                        'counterparty' => $counterparty,
+                        'method' => $transaction->payment_method,
+                        'status' => $transaction->status,
+                        'date' => $transaction->created_at->format('Y-m-d H:i:s')
+                    ],
+                    'wallet' => [
+                        'balance' => number_format($wallet->balance, 2, '.', ''),
+                        'formatted_balance' => '$' . number_format($wallet->balance, 2)
+                    ],
+                    'message' => 'Payment successful'
+                ]);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Validation failed: ' . json_encode($e->errors())
+            ], 422);
+
+        } catch (\Exception $e) {
+            Log::error('Payment error: ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
+            
+            return response()->json([
+                'success' => false,
+                'error' => 'Payment failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Resolve the display label for a transaction counterparty.
+     */
+    private function resolveCounterpartyLabel(?User $user): string
+    {
+        if (!$user) {
+            return 'Unknown';
+        }
+
+        $merchantName = $user->merchant->business_name ?? null;
+
+        return $merchantName ?: ($user->phone_number ?? 'Unknown');
     }
 }
