@@ -79,6 +79,7 @@ class AuthController extends Controller
                     'business_name' => $request->business_name,
                     'merchant_code' => $this->generateMerchantCode(),
                     'location' => $request->location,
+                    'is_active' => true,
                 ]);
             }
 
@@ -148,6 +149,17 @@ class AuthController extends Controller
                     'error' => 'Invalid credentials',
                 ], 401);
             }
+
+                if ($user->role === 'merchant') {
+                    $merchantProfile = $user->merchant;
+
+                    if (!$merchantProfile || !$merchantProfile->is_active) {
+                        return response()->json([
+                            'success' => false,
+                            'error' => 'Merchant account is inactive',
+                        ], 403);
+                    }
+                }
 
             // Check if account is locked
             if ($user->isLocked()) {
@@ -242,6 +254,20 @@ class AuthController extends Controller
                 'error' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Logout user.
+     *
+     * JWT in this project is stateless, so logout is handled client-side
+     * by discarding the token.
+     */
+    public function logout(Request $request)
+    {
+        return response()->json([
+            'success' => true,
+            'message' => 'Logged out successfully',
+        ], 200);
     }
 
     /**

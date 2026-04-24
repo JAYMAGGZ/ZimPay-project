@@ -188,6 +188,13 @@ class TransactionController extends Controller
                         'error' => 'Merchant not found'
                     ], 404);
                 }
+
+                if (!$merchant->is_active) {
+                    return response()->json([
+                        'success' => false,
+                        'error' => 'Merchant account is inactive'
+                    ], 403);
+                }
                 
                 $receiverWallet = $merchant->user->wallet ?? null;
                 $counterparty = $merchant->business_name;

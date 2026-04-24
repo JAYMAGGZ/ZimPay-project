@@ -26,6 +26,9 @@ Route::prefix('auth')->group(function () {
 
 // Protected routes (require authentication)
 Route::middleware('auth.jwt')->group(function () {
+    // Auth routes
+    Route::post('/auth/logout', [AuthController::class, 'logout']);
+
     
     // User routes
     Route::get('/user', function (Request $request) {

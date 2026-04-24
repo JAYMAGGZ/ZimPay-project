@@ -22,12 +22,14 @@ class Merchant extends Model
         'merchant_code',
         'qr_code_data',
         'location',
+        'is_active',
     ];
 
     /**
      * The attributes that should be cast.
      */
     protected $casts = [
+        'is_active' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
