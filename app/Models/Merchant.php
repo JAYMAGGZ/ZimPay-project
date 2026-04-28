@@ -55,37 +55,50 @@ class Merchant extends Model
     /**
      * Get total sales amount.
      */
-    public function getTotalSales(): float
+    public function getTotalSales($startDate = null): float
     {
         return $this->transactions()
+            ->when($startDate, function ($query) use ($startDate) {
+                return $query->where('created_at', '>=', $startDate);
+            })
             ->sum('amount');
     }
 
     /**
      * Get sales for a specific date range.
      */
-    public function getSalesForPeriod($startDate, $endDate): float
+    public function getSalesForPeriod($startDate, $endDate = null): float
     {
+        if ($endDate !== null) {
+            return $this->transactions()
+                ->whereBetween('created_at', [$startDate, $endDate])
+                ->sum('amount');
+        }
+
         return $this->transactions()
-            ->whereBetween('created_at', [$startDate, $endDate])
+            ->where('created_at', '>=', $startDate)
             ->sum('amount');
     }
 
     /**
      * Get transaction count.
      */
-    public function getTransactionCount(): int
+    public function getTransactionCount($startDate = null): int
     {
-        return $this->transactions()->count();
+        return $this->transactions()
+            ->when($startDate, function ($query) use ($startDate) {
+                return $query->where('created_at', '>=', $startDate);
+            })
+            ->count();
     }
 
     /**
      * Get average transaction value.
      */
-    public function getAverageTransactionValue(): float
+    public function getAverageTransactionValue($startDate = null): float
     {
-        $count = $this->getTransactionCount();
-        return $count > 0 ? $this->getTotalSales() / $count : 0.0;
+        $count = $this->getTransactionCount($startDate);
+        return $count > 0 ? $this->getTotalSales($startDate) / $count : 0.0;
     }
 
     /**

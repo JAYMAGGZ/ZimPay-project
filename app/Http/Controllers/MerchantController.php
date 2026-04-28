@@ -118,6 +118,7 @@ class MerchantController extends Controller
             $totalSales = $merchant->getTotalSales();
             $periodSales = $startDate ? $merchant->getSalesForPeriod($startDate) : $totalSales;
             $transactionCount = $merchant->getTransactionCount($startDate);
+            $allTimeTransactionCount = $merchant->getTransactionCount();
             $averageTransaction = $merchant->getAverageTransactionValue($startDate);
 
             // Get recent transactions
@@ -151,6 +152,7 @@ class MerchantController extends Controller
                     'total_sales_all_time' => number_format($totalSales, 2),
                     'sales_this_period' => number_format($periodSales, 2),
                     'transaction_count' => $transactionCount,
+                    'transaction_count_all_time' => $allTimeTransactionCount,
                     'average_transaction' => number_format($averageTransaction, 2),
                     'wallet_balance' => $user->wallet->formatted_balance,
                 ],

@@ -6,6 +6,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\WalletController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Controllers\MerchantController;
+use App\Http\Controllers\UssdController;
 
 /*
 |--------------------------------------------------------------------------
@@ -23,6 +24,9 @@ Route::prefix('auth')->group(function () {
     Route::post('/register', [AuthController::class, 'register']);
     Route::post('/login', [AuthController::class, 'login']);
 });
+
+// Public USSD gateway callback placeholder
+Route::post('/ussd/callback', [UssdController::class, 'callback']);
 
 // Protected routes (require authentication)
 Route::middleware('auth.jwt')->group(function () {
@@ -58,5 +62,13 @@ Route::middleware('auth.jwt')->group(function () {
         Route::get('/profile', [MerchantController::class, 'getProfile']);
         Route::get('/dashboard', [MerchantController::class, 'getDashboard']);
         Route::post('/qr-code', [MerchantController::class, 'generateQrCode']);
+    });
+
+    // USSD routes
+    Route::prefix('ussd')->group(function () {
+        Route::post('/initiate', [UssdController::class, 'initiate']);
+        Route::post('/process', [UssdController::class, 'process']);
+        Route::get('/status/{transaction_id}', [UssdController::class, 'status']);
+        Route::get('/merchant/{merchant_code}', [UssdController::class, 'getMerchantUssdInfo']);
     });
 });
